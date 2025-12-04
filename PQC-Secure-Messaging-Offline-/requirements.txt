@@ -1,0 +1,8 @@
+# PQC Secure Messenger - Web Version Dependencies
+flask==3.1.2
+flask-socketio==5.5.1
+python-socketio==5.15.0
+eventlet==0.40.4
+cryptography==46.0.3
+pqcrypto==0.3.4
+gunicorn==21.2.0

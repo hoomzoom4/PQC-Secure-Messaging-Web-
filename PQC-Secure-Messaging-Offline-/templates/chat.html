@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PQC Secure Messenger</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        :root { --bg:#050505; --panel:rgba(20,20,30,0.9); --cyan:#00f2ff; --purp:#bc13fe; --green:#00ff9d; --text:#e0e0e0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', monospace; outline: none; }
+        body { background: radial-gradient(circle at 50% 0, #1a1a40, var(--bg)); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        
+        /* Shared Styles */
+        .btn { border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; background: var(--cyan); color: #000; }
+        .btn:hover { opacity: 0.9; transform: scale(1.02); }
+        .btn-outline { background: transparent; border: 1px solid var(--cyan); color: var(--cyan); }
+        .btn-warn { background: rgba(188,19,254,0.2); color: var(--purp); border: 1px solid var(--purp); }
+        input { background: #111; border: 1px solid #333; color: #fff; padding: 12px; border-radius: 6px; width: 100%; }
+        input:focus { border-color: var(--cyan); }
+
+        /* Login Screen */
+        #login { display: flex; height: 100%; align-items: center; justify-content: center; }
+        .box { background: var(--panel); padding: 40px; border-radius: 12px; border: 1px solid #333; width: 400px; text-align: center; box-shadow: 0 0 30px rgba(0,0,0,0.5); }
+        .box h1 { color: var(--cyan); margin-bottom: 20px; font-size: 24px; }
+        
+        /* Chat Screen */
+        #chat { display: none; height: 100%; max-width: 1000px; margin: 0 auto; width: 100%; background: #0a0a0f; border-left: 1px solid #222; border-right: 1px solid #222; flex-direction: column; }
+        .header { padding: 15px 20px; border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); }
+        .badge { font-size: 10px; padding: 4px 10px; border-radius: 10px; border: 1px solid #444; margin-left: 10px; text-transform: uppercase; }
+        .perm-mode { border-color: orange; color: orange; }
+        
+        #msgs { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .msg { max-width: 80%; display: flex; flex-direction: column; animation: fadeIn 0.3s; }
+        .msg.me { align-self: flex-end; } .msg.them { align-self: flex-start; }
+        .bubble { padding: 12px 16px; border-radius: 8px; font-size: 14px; line-height: 1.4; }
+        .me .bubble { background: rgba(0,242,255,0.15); border: 1px solid rgba(0,242,255,0.3); color: #fff; }
+        .them .bubble { background: #1a1a1a; border: 1px solid #333; color: #ddd; }
+        .meta { font-size: 10px; margin-top: 4px; opacity: 0.8; display: flex; gap: 10px; }
+        .verified { color: var(--green); } 
+        /* Sys text updated to be much lighter/closer to white */
+        .sys { align-self: center; font-size: 11px; color: #d4d4d4; margin: 10px 0; }
+        
+        .rotate-event { text-align: center; color: var(--purp); font-size: 11px; padding: 10px; background: rgba(188,19,254,0.05); border: 1px dashed var(--purp); border-radius: 6px; width: 100%; }
+        
+        .controls { padding: 10px 20px; border-top: 1px solid #222; display: flex; gap: 10px; background: #050505; }
+        /* Added flex:1 to input to ensure button doesn't squash it */
+        .input-area { padding: 20px; background: #080808; display: flex; gap: 10px; }
+        .input-area input { flex: 1; }
+        
+        /* Stats Modal */
+        #modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; z-index: 99; }
+        .modal-content { background: #111; padding: 30px; width: 90%; max-width: 400px; border: 1px solid var(--cyan); border-radius: 8px; }
+        .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #222; font-size: 12px; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <div id="login">
+        <div class="box">
+            <h1>PQC Messenger</h1>
+            <input id="uIn" type="text" placeholder="Identity (e.g. Alice)" maxlength="20">
+            <button class="btn" style="width:100%; margin-top:20px" onclick="join()">INITIALIZE SESSION</button>
+            <div style="margin-top:25px; font-size:12px; color:#d4d4d4; line-height: 1.6;">
+                <div>ML-KEM-512 Key Exchange</div>
+                <div>ML-DSA-44 Signatures</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="chat">
+        <div class="header">
+            <div>
+                <b id="uDisplay" style="color:#fff; font-size:18px">User</b>
+                <span id="modeBadge" class="badge">EPHEMERAL</span>
+            </div>
+            <div style="font-size:12px">
+                <span id="users">Users: 0</span> &nbsp;|&nbsp; 
+                <span id="ctr">Next Rot: 10</span> &nbsp;
+                <button class="btn-outline" style="padding:4px 10px; font-size:10px" onclick="getStats()">STATS</button>
+            </div>
+        </div>
+
+        <div id="msgs"></div>
+
+        <div class="controls">
+            <button class="btn btn-warn" onclick="rot()">Force Rotation</button>
+            <button id="modeBtn" class="btn-outline" style="margin-left:auto" onclick="toggleMode()">| Switch to Permanent |</button>
+        </div>
+
+        <div class="input-area">
+            <input id="mIn" type="text" placeholder="Encrypted message..." onkeypress="if(event.key==='Enter') send()">
+            <button class="btn" onclick="send()">Send</button>
+        </div>
+    </div>
+
+    <div id="modal" onclick="this.style.display='none'">
+        <div class="modal-content" id="statsBox" onclick="event.stopPropagation()"></div>
+    </div>
+
+    <script>
+        const socket = io();
+        const $ = (id) => document.getElementById(id);
+        let me = null, perm = false, cnt = 0;
+        const ROTATE_AT = 10;
+
+        // --- Socket Events ---
+        socket.on('joined', d => {
+            me = d.username;
+            $('uDisplay').innerText = me;
+            $('login').style.display = 'none';
+            $('chat').style.display = 'flex';
+        });
+
+        socket.on('user_list', d => $('users').innerText = `Users: ${d.users.length}`);
+        
+        socket.on('system_message', d => {
+            $('msgs').innerHTML += `<div class="sys">[${d.timestamp}] ${d.text}</div>`;
+            scroll();
+        });
+
+        socket.on('new_message', d => {
+            const isMe = d.sender === 'Me';
+            if(isMe) { cnt++; updateCtr(); }
+            
+            const ver = d.verified ? 'Verified' : 'Invalid';
+            const ttl = d.is_permanent ? 'PERMANENT' : '7-DAY TTL';
+            
+            const html = `
+            <div class="msg ${isMe?'me':'them'}">
+                <div style="font-size:10px; margin-bottom:4px; color:${isMe?'var(--cyan)':'#ff2a6d'}">${d.sender} • ${d.timestamp}</div>
+                <div class="bubble">${esc(d.text)}</div>
+                <div class="meta"><span class="verified">${ver}</span> <span>${ttl}</span></div>
+            </div>`;
+            
+            $('msgs').innerHTML += html;
+            scroll();
+        });
+
+        socket.on('key_rotation', d => {
+            $('msgs').innerHTML += `
+            <div class="rotate-event">
+                <b>KEY ROTATION (${d.rotation_type})</b><br>
+                Initiator: ${d.username} | Hash: ${d.new_key_fp}...<br>
+                <span style="font-size:9px">Forward Secrecy Established</span>
+            </div>`;
+            cnt = 0; updateCtr(); scroll();
+        });
+
+        socket.on('mode_changed', d => {
+            if(d.username === me) {
+                perm = d.mode === 'PERMANENT';
+                $('modeBadge').innerText = d.mode;
+                $('modeBadge').className = `badge ${perm ? 'perm-mode' : ''}`;
+                $('modeBtn').innerText = perm ? '| Switch to Temporary |' : 'Switch to Permanent';
+                $('header').style.borderBottomColor = perm ? 'orange' : '#222';
+            }
+        });
+
+        socket.on('stats', d => {
+            // Label color changed to #ccc to be closer to white
+            $('statsBox').innerHTML = `
+                <h3 style="color:var(--cyan); margin-bottom:15px">CRYPTO STATISTICS</h3>
+                ${row('KEM Algo', d.kem_algorithm)}
+                ${row('Signature', d.sig_algorithm)}
+                ${row('Cipher', d.cipher)}
+                ${row('Session Key', d.session_key)}
+                ${row('Msgs Sent', d.message_count)}
+                ${row('Rotations', d.rotation_count)}
+                <button class="btn" style="width:100%; margin-top:20px" onclick="$('modal').style.display='none'">CLOSE</button>
+            `;
+            $('modal').style.display = 'flex';
+        });
+
+        socket.on('error', d => alert(d.message));
+
+        // --- Actions ---
+        function join() {
+            const u = $('uIn').value.trim();
+            if(u) socket.emit('join', { username: u });
+        }
+
+        function send() {
+            const txt = $('mIn').value.trim();
+            if(!txt) return;
+            socket.emit('send_message', { message: txt, is_permanent: perm });
+            $('mIn').value = '';
+        }
+
+        function rot() { socket.emit('rotate_keys', { auto: false }); }
+
+        function toggleMode() {
+            if(!perm && !confirm('Switch to PERMANENT? Messages will not auto-delete.')) return;
+            perm = !perm;
+            socket.emit('toggle_mode', { is_permanent: perm });
+        }
+
+        function getStats() { socket.emit('get_stats'); }
+
+        // --- Helpers ---
+        const updateCtr = () => $('ctr').innerText = `Next Rot: ${Math.max(0, ROTATE_AT - cnt)}`;
+        const scroll = () => { const m = $('msgs'); m.scrollTop = m.scrollHeight; };
+        const esc = (t) => { const d=document.createElement('div'); d.textContent=t; return d.innerHTML; };
+        // Row label color changed to #ccc
+        const row = (l, v) => `<div class="row"><span style="color:#ccc">${l}</span><span style="color:var(--green)">${v}</span></div>`;
+
+        // Handle Login Enter Key
+        $('uIn').addEventListener('keypress', e => { if(e.key === 'Enter') join(); });
+
+    </script>
+</body>
+</html>
