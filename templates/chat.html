@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PQC Secure Messenger</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e8e8e8;
+        }
+
+        /* Login Screen */
+        .login-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .login-box {
+            background: #16213e;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+
+        .login-box h1 {
+            color: #3498db;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .login-box .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .login-box input {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            background: #1a1a2e;
+            color: white;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+
+        .login-box input:focus {
+            outline: 2px solid #3498db;
+        }
+
+        .login-box button {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            background: #27ae60;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .login-box button:hover {
+            background: #2ecc71;
+        }
+
+        .features {
+            margin-top: 30px;
+            text-align: left;
+            color: #7f8c8d;
+            font-size: 13px;
+        }
+
+        .features div {
+            margin: 8px 0;
+        }
+
+        .features span {
+            color: #2ecc71;
+            margin-right: 8px;
+        }
+
+        /* Chat Container */
+        .chat-container {
+            display: none;
+            flex-direction: column;
+            height: 100vh;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            background: #27ae60;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .header.permanent {
+            background: #e67e22;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .username-display {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .mode-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .rotation-counter {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .online-users {
+            font-size: 13px;
+        }
+
+        .stats-btn {
+            background: #1a1a2e;
+            color: #00ff00;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+        }
+
+        /* Chat Messages */
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #16213e;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 4px;
+        }
+
+        .message-sender {
+            font-weight: bold;
+        }
+
+        .message-sender.me {
+            color: #3498db;
+        }
+
+        .message-sender.them {
+            color: #e74c3c;
+        }
+
+        .message-time {
+            color: #7f8c8d;
+            font-size: 12px;
+        }
+
+        .message-text {
+            padding: 10px 15px;
+            background: #1a1a2e;
+            border-radius: 12px;
+            display: inline-block;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .message-meta {
+            margin-top: 5px;
+            font-size: 11px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .verified {
+            color: #2ecc71;
+        }
+
+        .unverified {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .ttl {
+            color: #7f8c8d;
+        }
+
+        .ttl.permanent {
+            color: #e67e22;
+        }
+
+        /* System Messages */
+        .system-message {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 12px;
+            margin: 10px 0;
+            font-family: 'Consolas', monospace;
+        }
+
+        /* Key Rotation */
+        .rotation-event {
+            background: #2d1f3d;
+            color: #9b59b6;
+            text-align: center;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+            font-family: 'Consolas', monospace;
+            font-weight: bold;
+        }
+
+        .rotation-event .line {
+            color: #9b59b6;
+            letter-spacing: 2px;
+        }
+
+        /* Controls */
+        .controls {
+            background: #1a1a2e;
+            padding: 10px 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .controls button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: opacity 0.3s;
+        }
+
+        .controls button:hover {
+            opacity: 0.8;
+        }
+
+        .rotate-btn {
+            background: #9b59b6;
+            color: white;
+        }
+
+        .mode-btn {
+            background: #e67e22;
+            color: white;
+            margin-left: auto;
+        }
+
+        /* Input Area */
+        .input-area {
+            background: #1a1a2e;
+            padding: 15px 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-area input {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            background: #16213e;
+            color: white;
+            font-size: 14px;
+        }
+
+        .input-area input:focus {
+            outline: 2px solid #3498db;
+        }
+
+        .input-area button {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            background: #3498db;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .input-area button:hover {
+            background: #2980b9;
+        }
+
+        /* Stats Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background: #16213e;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 450px;
+            width: 90%;
+            font-family: 'Consolas', monospace;
+        }
+
+        .modal-content h2 {
+            color: #3498db;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .modal-content .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #1a1a2e;
+        }
+
+        .modal-content .stat-label {
+            color: #7f8c8d;
+        }
+
+        .modal-content .stat-value {
+            color: #2ecc71;
+        }
+
+        .modal-content button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 20px;
+            border: none;
+            border-radius: 6px;
+            background: #3498db;
+            color: white;
+            cursor: pointer;
+        }
+
+        /* Error */
+        .error-toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #e74c3c;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            display: none;
+            z-index: 1001;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div class="login-container" id="loginScreen">
+        <div class="login-box">
+            <h1>PQC Secure Messenger</h1>
+            <p class="subtitle">Post-Quantum Cryptography Demo</p>
+
+            <input type="text" id="usernameInput" placeholder="Enter your name (e.g., Alice or Bob)" maxlength="20">
+            <button onclick="joinChat()">Join Secure Chat</button>
+
+            <div class="features">
+                <div><span>&#10003;</span> ML-KEM-512 (Kyber) Key Exchange</div>
+                <div><span>&#10003;</span> ML-DSA-44 (Dilithium) Signatures</div>
+                <div><span>&#10003;</span> AES-256-GCM Encryption</div>
+                <div><span>&#10003;</span> Auto Key Rotation</div>
+                <div><span>&#10003;</span> Forward Secrecy</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Screen -->
+    <div class="chat-container" id="chatScreen">
+        <div class="header" id="header">
+            <div class="header-left">
+                <span class="username-display" id="usernameDisplay">User</span>
+                <span class="mode-badge" id="modeBadge">EPHEMERAL</span>
+            </div>
+            <div class="header-right">
+                <span class="online-users" id="onlineUsers">Users: 0</span>
+                <span class="rotation-counter" id="rotationCounter">Rotate in: 10</span>
+                <button class="stats-btn" onclick="showStats()">Stats</button>
+            </div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages"></div>
+
+        <div class="controls">
+            <button class="rotate-btn" onclick="rotateKeys()">Rotate Keys</button>
+            <button class="mode-btn" id="modeBtn" onclick="toggleMode()">Permanent Mode</button>
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="messageInput" placeholder="Type your encrypted message..." onkeypress="handleKeyPress(event)">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <!-- Stats Modal -->
+    <div class="modal" id="statsModal" onclick="closeStats(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <h2>PQC Crypto Stats</h2>
+            <div id="statsContent"></div>
+            <button onclick="closeStatsBtn()">Close</button>
+        </div>
+    </div>
+
+    <!-- Error Toast -->
+    <div class="error-toast" id="errorToast"></div>
+
+    <script>
+        const socket = io();
+        let currentUser = null;
+        let isPermanentMode = false;
+        let messageCount = 0;
+        const AUTO_ROTATE = 10;
+
+        // Socket event handlers
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+
+        socket.on('joined', (data) => {
+            currentUser = data.username;
+            document.getElementById('usernameDisplay').textContent = data.username;
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('chatScreen').style.display = 'flex';
+        });
+
+        socket.on('error', (data) => {
+            showError(data.message);
+        });
+
+        socket.on('user_list', (data) => {
+            document.getElementById('onlineUsers').textContent = `Users: ${data.users.length}`;
+        });
+
+        socket.on('user_joined', (data) => {
+            // Handled by system_message
+        });
+
+        socket.on('user_left', (data) => {
+            // Handled by system_message
+        });
+
+        socket.on('system_message', (data) => {
+            addSystemMessage(data.text, data.timestamp);
+        });
+
+        socket.on('session_established', (data) => {
+            // Session ready
+        });
+
+        socket.on('new_message', (data) => {
+            addMessage(data.sender, data.text, data.verified, data.is_permanent, data.timestamp);
+
+            if (data.sender === 'Me') {
+                messageCount++;
+                updateRotationCounter();
+            }
+        });
+
+        socket.on('key_rotation', (data) => {
+            addRotationEvent(data.username, data.rotation_type, data.new_key_fp, data.timestamp);
+            messageCount = 0;
+            updateRotationCounter();
+        });
+
+        socket.on('mode_changed', (data) => {
+            if (data.username === currentUser) {
+                isPermanentMode = data.mode === 'PERMANENT';
+                updateModeUI();
+            }
+        });
+
+        socket.on('stats', (data) => {
+            displayStats(data);
+        });
+
+        // UI Functions
+        function joinChat() {
+            const username = document.getElementById('usernameInput').value.trim();
+            if (!username) {
+                showError('Please enter a username');
+                return;
+            }
+            socket.emit('join', { username });
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            socket.emit('send_message', {
+                message,
+                is_permanent: isPermanentMode
+            });
+            input.value = '';
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') sendMessage();
+        }
+
+        function rotateKeys() {
+            socket.emit('rotate_keys', { auto: false });
+        }
+
+        function toggleMode() {
+            if (!isPermanentMode) {
+                if (confirm('Switch to PERMANENT mode?\\n\\nMessages will NOT be auto-deleted.')) {
+                    isPermanentMode = true;
+                    socket.emit('toggle_mode', { is_permanent: true });
+                    updateModeUI();
+                }
+            } else {
+                isPermanentMode = false;
+                socket.emit('toggle_mode', { is_permanent: false });
+                updateModeUI();
+            }
+        }
+
+        function updateModeUI() {
+            const header = document.getElementById('header');
+            const badge = document.getElementById('modeBadge');
+            const btn = document.getElementById('modeBtn');
+
+            if (isPermanentMode) {
+                header.classList.add('permanent');
+                badge.textContent = 'PERMANENT';
+                btn.textContent = 'Ephemeral Mode';
+            } else {
+                header.classList.remove('permanent');
+                badge.textContent = 'EPHEMERAL';
+                btn.textContent = 'Permanent Mode';
+            }
+        }
+
+        function updateRotationCounter() {
+            const remaining = AUTO_ROTATE - messageCount;
+            document.getElementById('rotationCounter').textContent = `Rotate in: ${remaining}`;
+        }
+
+        function addMessage(sender, text, verified, isPerm, timestamp) {
+            const container = document.getElementById('chatMessages');
+            const div = document.createElement('div');
+            div.className = 'message';
+
+            const senderClass = sender === 'Me' ? 'me' : 'them';
+            const verifiedHtml = verified
+                ? '<span class="verified">[Signature VERIFIED]</span>'
+                : '<span class="unverified">[Signature INVALID!]</span>';
+            const ttlClass = isPerm ? 'ttl permanent' : 'ttl';
+            const ttlText = isPerm ? '[PERMANENT]' : '[7-day TTL]';
+
+            div.innerHTML = `
+                <div class="message-header">
+                    <span class="message-sender ${senderClass}">${sender}</span>
+                    <span class="message-time">${timestamp}</span>
+                </div>
+                <div class="message-text">${escapeHtml(text)}</div>
+                <div class="message-meta">
+                    ${verifiedHtml}
+                    <span class="${ttlClass}">${ttlText}</span>
+                </div>
+            `;
+
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addSystemMessage(text, timestamp) {
+            const container = document.getElementById('chatMessages');
+            const div = document.createElement('div');
+            div.className = 'system-message';
+            div.textContent = `[${timestamp}] ${text}`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addRotationEvent(username, type, keyFp, timestamp) {
+            const container = document.getElementById('chatMessages');
+            const div = document.createElement('div');
+            div.className = 'rotation-event';
+            div.innerHTML = `
+                <div class="line">════════════════════════════════════</div>
+                <div>KEY ${type} by ${username}</div>
+                <div>New Key: ${keyFp}...</div>
+                <div>Forward Secrecy Established</div>
+                <div class="line">════════════════════════════════════</div>
+            `;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function showStats() {
+            socket.emit('get_stats');
+            document.getElementById('statsModal').style.display = 'flex';
+        }
+
+        function displayStats(stats) {
+            const content = document.getElementById('statsContent');
+            content.innerHTML = `
+                <div class="stat-row">
+                    <span class="stat-label">Key Exchange</span>
+                    <span class="stat-value">${stats.kem_algorithm}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Signatures</span>
+                    <span class="stat-value">${stats.sig_algorithm}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Cipher</span>
+                    <span class="stat-value">${stats.cipher}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Session Key</span>
+                    <span class="stat-value">${stats.session_key}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Messages Sent</span>
+                    <span class="stat-value">${stats.message_count}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Rotations</span>
+                    <span class="stat-value">${stats.rotation_count}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Auto-Rotate</span>
+                    <span class="stat-value">Every ${stats.auto_rotate_after} msgs</span>
+                </div>
+            `;
+        }
+
+        function closeStats(e) {
+            if (e.target.id === 'statsModal') {
+                document.getElementById('statsModal').style.display = 'none';
+            }
+        }
+
+        function closeStatsBtn() {
+            document.getElementById('statsModal').style.display = 'none';
+        }
+
+        function showError(msg) {
+            const toast = document.getElementById('errorToast');
+            toast.textContent = msg;
+            toast.style.display = 'block';
+            setTimeout(() => toast.style.display = 'none', 3000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Allow Enter key on login
+        document.getElementById('usernameInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') joinChat();
+        });
+    </script>
+</body>
+</html>
