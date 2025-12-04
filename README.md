@@ -1,4 +1,4 @@
-# PQC Secure Messenger - Web Version
+# PQC Secure Messenger - Web + Offline Version
 
 A real-time encrypted messaging application using **Post-Quantum Cryptography (PQC)**. This prototype demonstrates quantum-resistant cryptography in a practical messaging application, preparing for the post-quantum computing era.
 
@@ -21,23 +21,11 @@ A real-time encrypted messaging application using **Post-Quantum Cryptography (P
 
 ---
 
-## What is Post-Quantum Cryptography?
-
-Current encryption methods (RSA, ECC) will be broken by quantum computers. PQC algorithms are designed to resist attacks from both classical and quantum computers. This prototype uses:
-
-- **ML-KEM-512** (FIPS 203) - Module-Lattice-Based Key Encapsulation Mechanism, formerly known as Kyber
-- **ML-DSA-44** (FIPS 204) - Module-Lattice-Based Digital Signature Algorithm, formerly known as Dilithium
-- **AES-256-GCM** - Symmetric encryption (quantum-resistant when using 256-bit keys)
-
-These algorithms were selected by NIST as the first standardized post-quantum cryptographic algorithms.
-
----
-
 ## Features
 
 ### Cryptographic Features
-- **Quantum-resistant key exchange** using ML-KEM-512 (Kyber)
-- **Quantum-resistant digital signatures** using ML-DSA-44 (Dilithium)
+- **Quantum-resistant key exchange** using ML-KEM-512 (Kyber) Module-Lattice-Based Key Encapsulation Mechanism
+- **Quantum-resistant digital signatures** using ML-DSA-44 (Dilithium) Module-Lattice-Based Digital Signature Algorithm, formerly known as Dilithium
 - **Authenticated encryption** with AES-256-GCM
 - **Forward secrecy** through automatic key rotation
 - **Message authentication** with PQC signatures
@@ -358,9 +346,7 @@ PQC-Secure-Messaging-Web/
    - Data lost on server restart
    - No persistence for "permanent" messages
 
-4. **No Rate Limiting** - Vulnerable to spam/DoS attacks
-
-5. **Simplified Key Management** - Production systems need:
+4. **Simplified Key Management** - Production systems need:
    - Key storage/backup mechanisms
    - Certificate authorities for public key verification
    - Key revocation mechanisms
@@ -405,56 +391,3 @@ Consider:
 - Managed Python runtime
 - Free tier with usage limits
 
-### Deploy Your Own Instance
-
-#### Option 1: Railway.app (Recommended)
-
-1. Fork this repository on GitHub
-2. Sign up at [Railway.app](https://railway.app)
-3. Create new project → "Deploy from GitHub"
-4. Select your forked repository
-5. Railway auto-detects Python and deploys
-6. Get your Railway URL
-7. (Optional) Add custom domain via Cloudflare
-
-#### Option 2: Render.com
-
-1. Sign up at [Render.com](https://render.com)
-2. New Web Service → Connect repository
-3. Build command: `pip install -r requirements.txt`
-4. Start command: `python app.py`
-5. Deploy
-
-#### Option 3: Self-Hosted VPS
-
-See the offline version setup, then configure Nginx as reverse proxy and use systemd for service management.
-
----
-
-## Contributing
-
-This is an educational prototype. Contributions welcome for:
-- Bug fixes
-- Documentation improvements
-- Additional PQC algorithm demonstrations
-- Performance optimizations
-- Security enhancements (for educational purposes)
-
----
-
-## License
-
-This project is open-source for educational purposes. Please credit the original author when using or modifying.
-
----
-
-## Learn More
-
-- **NIST PQC:** https://csrc.nist.gov/projects/post-quantum-cryptography
-- **ML-KEM (Kyber):** FIPS 203 standard
-- **ML-DSA (Dilithium):** FIPS 204 standard
-- **pqcrypto library:** https://github.com/PQClean/PQClean
-
----
-
-**Built with quantum-resistant cryptography for the future.**
